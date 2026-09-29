@@ -23,18 +23,36 @@
         return null
     }
 
-    private fun searchAndExtractCover(query: String, apiKey: String): String? {
+   private fun searchAndExtractCover(query: String, apiKey: String): String? {
         val searchUrl = "https://www.thecoverproject.net/view.php?search=" + 
             URLEncoder.encode(query, StandardCharsets.UTF_8.toString())
 
         val htmlBody = executeScraper(searchUrl, apiKey) ?: return null
         
-        // Extragem primul cover_id din rezultate
-        val coverIdMatch = Regex("""view\.php\?cover_id=(\d+)""", RegexOption.IGNORE_CASE).find(htmlBody)
-        val coverId = coverIdMatch?.groups?.get(1)?.value
+        // Căutăm în HTML-ul rezultatelor un bloc sau un link care conține titlul căutat sau un cover_id valid asociat
+        // Extragem toate perechile de cover_id și textul din jur pentru a găsi potrivirea corectă
+        val regex = Regex("""href=["']view\.php\?cover_id=(\d+)["'][^>]*>(.*?)</a>""", RegexOption.IGNORE_CASE)
+        val matches = regex.findAll(htmlBody)
 
-        if (coverId != null) {
-            val detailUrl = "https://www.thecoverproject.net/view.php?cover_id=$coverId"
+        var matchedCoverId: String? = null
+        val queryLower = query.lowercase()
+
+        for (match in matches) {
+            val coverId = match.groups[1]?.value
+            val linkText = match.groups[2]?.value?.lowercase() ?: ""
+
+            // Verificăm dacă textul link-ului sau contextul conține cuvintele principale din căutare
+            if (linkText.contains(queryLower) || queryLower.split(" ").all { linkText.contains(it) }) {
+                matchedCoverId = coverId
+                break
+            }
+        }
+
+        // Fallback la primul ID găsit doar dacă nu avem altceva, dar preferabil să verificăm
+        val finalCoverId = matchedCoverId ?: Regex("""view\.php\?cover_id=(\d+)""", RegexOption.IGNORE_CASE).find(htmlBody)?.groups?.get(1)?.value
+
+        if (finalCoverId != null) {
+            val detailUrl = "https://www.thecoverproject.net/view.php?cover_id=$finalCoverId"
             val detailHtml = executeScraper(detailUrl, apiKey)
             if (detailHtml != null) {
                 val imageUrl = extractImageFromDetail(detailHtml)
@@ -44,7 +62,6 @@
 
         return extractBestCoverUrl(htmlBody)
     }
-
     private fun executeScraper(targetUrl: String, apiKey: String): String? {
         val encodedTargetUrl = URLEncoder.encode(targetUrl, StandardCharsets.UTF_8.toString())
         val scraperUrl = "https://api.scraperapi.com/?api_key=$apiKey&url=$encodedTargetUrl"
