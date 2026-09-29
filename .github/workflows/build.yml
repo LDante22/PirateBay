@@ -1,0 +1,56 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+
+    - name: Generate Temporary Debug Keystore
+      run: |
+        keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
+    - name: Create Global Repositories Init Script
+      run: |
+        cat << 'EOF' > init.gradle
+        settingsEvaluated { settings ->
+            settings.pluginManagement.repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+            settings.dependencyResolutionManagement.repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        EOF
+
+    - name: Build Debug APK
+      env:
+        JAVA_OPTS: "-Djava.awt.headless=true"
+        GRADLE_OPTS: "-Djava.awt.headless=true"
+      run: gradle assembleDebug --no-daemon -Djava.awt.headless=true --init-script init.gradle
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug
+        path: app/build/outputs/apk/debug/app-debug.apk

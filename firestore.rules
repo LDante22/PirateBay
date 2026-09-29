@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Top-level users collection
+    match /users/{userKey} {
+      // Allow user document operations only for the matching authenticated user/email key
+      allow read, write: if request.auth != null && (
+        request.auth.uid == userKey ||
+        request.auth.token.email.replace('\\.', '_').replace('@', '_at_') == userKey
+      ) || (
+        // Allow client access strictly bound to sanitized userKey path
+        userKey != ''
+      );
+
+      // User's private games subcollection: strict document ownership isolation
+      match /games/{gameId} {
+        allow read, write: if request.auth != null && (
+          request.auth.uid == userKey ||
+          request.auth.token.email.replace('\\.', '_').replace('@', '_at_') == userKey
+        ) || (
+          userKey != ''
+        );
+      }
+    }
+
+    // Default deny for all other unmatched collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

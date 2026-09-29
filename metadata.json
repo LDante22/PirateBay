@@ -1,0 +1,6 @@
+{
+  "name": "The Tavern",
+  "description": "Video game wishlist library organized by console with disc covers and YouTube trailers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
