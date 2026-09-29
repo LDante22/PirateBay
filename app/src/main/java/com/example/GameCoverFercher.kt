@@ -1,4 +1,4 @@
-package com.example.data.metadata // Păstrează pachetul tău actual
+package com.example.data.metadata
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -30,7 +30,6 @@ class GameCoverFetcher {
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     val htmlBody = response.body?.string()
-                    // 2. Extragem direct link-ul imaginii din HTML-ul primit
                     if (htmlBody != null) {
                         extractImageUrlFromHtml(htmlBody)
                     } else {
@@ -46,14 +45,12 @@ class GameCoverFetcher {
         }
     }
 
-    // 3. Metoda simplă de căutare a imaginii în HTML cu Regex
+    // 2. Metoda de căutare a imaginii în HTML cu Regex
     private fun extractImageUrlFromHtml(html: String): String? {
-        // Căutăm un tag <img> sau un atribut care conține link-ul către imaginea coperții
         val regex = Regex("""src=["']([^"']+\.(?:jpg|jpeg|png))["']""", RegexOption.IGNORE_CASE)
         val matchResult = regex.find(html)
         
         return matchResult?.groups?.get(1)?.value?.let { imgUrl ->
-            // Dacă link-ul este relativ (începe cu / sau nu are domeniul complet), îl completăm
             if (imgUrl.startsWith("/")) {
                 "https://www.thecoverproject.net$imgUrl"
             } else if (!imgUrl.startsWith("http")) {
