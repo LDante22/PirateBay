@@ -668,36 +668,23 @@ class GameVaultViewModel(application: Application) : AndroidViewModel(applicatio
     /**
      * Applies a verified The Cover Project cover variant (front, spine, and back) to a game.
      */
-   fun detectGameWithAi(gameTitle: String, onComplete: ((Game) -> Unit)? = null) {
-        val cleanTitle = gameTitle.trim()
-        if (cleanTitle.isBlank()) return
-
-        viewModelScope.launch(Dispatchers.IO) {
-            isAiDetecting.value = true
-            aiDetectionStatus.value = "Finding game & console info..."
-            try {
-                val result = GameAiDetector.detectGame(cleanTitle)
-                val detectedGame = result.game
-                
-                // Caută automat coperta de pe The Cover Project
-                val coverUrl = GameCoverFetcher.fetchCoverFromCoverProject(detectedGame.title)
-                val finalGame = if (!coverUrl.isNullOrBlank()) {
-                    detectedGame.copy(coverArtUrl = coverUrl, coverSource = CoverSourceType.COVER_PROJECT)
-                } else {
-                    detectedGame
-                }
-
-                aiDetectedGame.value = finalGame
-                aiDetectionSource.value = result.source
-                aiDetectionStatus.value = "Found: ${finalGame.console.displayName} • Trailer & Cover ready"
-                onComplete?.invoke(finalGame)
-            } catch (e: Exception) {
-                aiDetectionStatus.value = "Details ready"
-                val fallbackGame = GameAiDetector.findInCatalogOrSynthesize(cleanTitle)
-                aiDetectedGame.value = fallbackGame
-                onComplete?.invoke(fallbackGame)
-            } finally {
-                isAiDetecting.value = false
+    fun applyCoverVariant(gameId: Long, variant: CoverProjectVariant) {
+        viewModelScope.launch {
+            val game = repository.getGameById(gameId) ?: return@launch
+            val updated = game.copy(
+                coverArtUrl = variant.frontCoverUrl.ifBlank { game.coverArtUrl },
+                backCoverUrl = variant.backCoverUrl.ifBlank { if (variant.isCompleteWrap) variant.completeCaseArtworkUrl else "" },
+                completeCaseArtwork = if (variant.isCompleteWrap) variant.completeCaseArtworkUrl else game.completeCaseArtwork,
+                coverSource = CoverSourceType.COVER_PROJECT,
+                backCoverSource = CoverSourceType.COVER_PROJECT
+            )
+            repository.updateGame(updated)
+            if (selectedGame.value?.id == game.id) {
+                selectedGame.value = updated
+            }
+            val email = userProfile.value.email
+            if (email.isNotBlank()) {
+                firestoreSyncManager.saveGameToFirestore(email, updated, viewModelScope)
             }
         }
     }
@@ -1635,4 +1622,3 @@ data class VersusSelectionState(
     val filterConsole: GameConsole = GameConsole.ALL,
     val filterStatus: String = "ALL"
 )
-
