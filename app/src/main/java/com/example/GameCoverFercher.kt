@@ -1,4 +1,4 @@
-package com.example.data.metadata
+package com.example
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
